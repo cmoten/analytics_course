@@ -1,0 +1,90 @@
+---
+title: L"Lahman Baseball Dataset"
+output: html_notebook
+---
+
+These are notes that follow the book [Analyzing Baseball Data with R](https://baseballwithr.wordpress.com/about/).
+
+# Libraries
+
+```{r libraries, message=FALSE}
+library(tidyverse)
+library(Lahman)
+```
+
+# Functions
+```{r functions}
+get_player_id <- function(Name){
+  Names <- stringr::str_split(Name, pattern = " ") %>% unlist()
+  firstName <- Names[1]
+  lastName <- Names[2]
+  
+  Lahman::People %>%
+    filter(nameFirst == firstName, nameLast == lastName) %>%
+    select(playerID) %>%
+    unlist()
+}
+```
+
+# Data
+If you want to download the complete dataset, then go to [Sean Lahman's Baseball Database](https://www.seanlahman.com/baseball-archive/statistics). Otherwise, you can use the `Lahman` package in R without the need to download any files.
+
+## Available Tables
+```{r lahman-data-tables}
+Lahman::LahmanData
+```
+
+The primary table we will need to get player information is the `People` table. A full explanation can be found the `README.txt` file in the Lahman Database site.
+
+```{r lahman-people-summary}
+data(People)
+People %>%
+  head(1)
+
+```
+
+## Small Example
+There are an assortment of analyses you can conduct with this data. The example below shows the HR trajectory of the top four HR hitters in MLB history.
+
+```{r hr-plot}
+players <- c("Babe Ruth", "Hank Aaron", "Barry Bonds", "Alex Rodriguez")
+player_ids <- map_chr(players, get_player_id)
+
+Lahman::Batting %>%
+  filter(playerID %in% player_ids) %>%
+  left_join(Lahman::People, by="playerID") %>%
+  group_by(playerID) %>%
+  mutate(Age = yearID - birthYear,
+         Player = paste(nameFirst, nameLast),
+         cum_HR = cumsum(HR)) %>%
+  ggplot(aes(x = Age, y = cum_HR)) +
+  geom_line(aes(linetype = Player, color = Player)) +
+  scale_y_continuous("Career Home Runs") +
+  ggtitle("Top 4 All-Time Home Run Hitters Career Home Runs by Age") +
+  theme_minimal()
+
+```
+
+## Questions
+
+### What is the average number of home runs recorded in each decade?
+
+```{r hr-by-decade}
+avg_HR <- Lahman::Teams %>%
+  mutate(decade = floor((yearID/10)) * 10) %>%
+  select(decade, G, HR) %>%
+  group_by(decade) %>%
+  summarise(totalGames = sum(G),
+            totalHR = sum(HR)) %>%
+  ungroup() %>%
+  mutate(averageHR = totalHR/totalGames)
+
+avg_HR %>%
+  ggplot(aes(x = decade, y = averageHR)) +
+  geom_line(color = "skyblue") +
+  xlab("Decade") +
+  scale_y_continuous("Averge HR per Game") +
+  theme_minimal()
+
+```
+
